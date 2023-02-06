@@ -1,0 +1,6 @@
+symulacja n cząsteczek kolumbowsko oddziałują ze sobą i grawitacja
+
+rysować rozkład prędkości i energii
+histogram wartości
+
+nie zderzają się
