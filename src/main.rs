@@ -16,12 +16,29 @@ fn main() {
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
 }
 
-#[derive(Default)]
-struct MyEguiApp {}
+struct MyEguiApp {
+    particles_pos: Vec<[f64; 2]>,
+    particles_previous_pos: Vec<[f64; 2]>,
+    particles_speed: Vec<f64>,
+}
 
 impl MyEguiApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self::default()
+    }
+
+    fn simulation(&mut self, time: f64) {
+        self.particles_pos[0][0] = time.sin();
+    }
+}
+
+impl Default for MyEguiApp {
+    fn default() -> Self {
+        Self {
+            particles_pos: vec![[0.5, 0.2]],
+            particles_previous_pos: Vec::new(),
+            particles_speed: Vec::new(),
+        }
     }
 }
 
@@ -35,9 +52,10 @@ impl eframe::App for MyEguiApp {
                     .width(700.0)
                     .allow_drag(false)
                     .allow_scroll(false)
-                    .allow_zoom(false);
+                    .allow_zoom(false)
+                    .allow_boxed_zoom(false);
                 markers_plot.show(ui, |plot_ui| {
-                    plot_ui.points(Points::new(vec![[0.5, 0.5]]).radius(5.0));
+                    plot_ui.points(Points::new(self.particles_pos.clone()).radius(5.0));
                 });
 
                 ui.vertical(|ui| {
@@ -51,6 +69,7 @@ impl eframe::App for MyEguiApp {
                         .allow_drag(false)
                         .allow_scroll(false)
                         .allow_zoom(false)
+                        .allow_boxed_zoom(false)
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
 
                     // Histogram energii
@@ -63,6 +82,7 @@ impl eframe::App for MyEguiApp {
                         .allow_drag(false)
                         .allow_scroll(false)
                         .allow_zoom(false)
+                        .allow_boxed_zoom(false)
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
                 });
 
@@ -70,7 +90,11 @@ impl eframe::App for MyEguiApp {
                 ui.vertical(|ui| {
                     ui.heading("Opcje");
                 });
-            })
+            });
+
+            let time = ui.input().time;
+            self.simulation(time);
+            ui.ctx().request_repaint()
         });
     }
 }
