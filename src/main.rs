@@ -1,14 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![allow(clippy::needless_return)]
 
 mod particle;
-use particle::{Particle};
-use rand::prelude::*;
+
+use particle::Particle;
 use rand::distributions::Uniform;
+use rand::prelude::*;
 
 use eframe::{
     egui::{
         self,
-        plot::{BarChart, Plot, Points},
+        plot::{Bar, BarChart, Plot, Points},
     },
     epaint::Color32,
 };
@@ -21,26 +23,26 @@ fn main() {
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
 }
 
-
 struct MyEguiApp {
     particles: Vec<Particle>,
 }
 
-
 impl MyEguiApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        return Self{
+        return Self {
             particles: {
                 let mut rng = rand::thread_rng();
-                std::iter::from_fn(
-                    move || { Some(Particle::new(
-                        rng.sample(Uniform::new(0.0, 1.0)), 
-                        rng.sample(Uniform::new(0.0, 1.0)), 
-                        rng.sample(Uniform::new(-5.0, 5.0)), 
-                        rng.sample(Uniform::new(0.0, 10.0)), 
-                        )) }
-                )
-            }.take(10).collect()
+                std::iter::from_fn(move || {
+                    Some(Particle::new(
+                        rng.sample(Uniform::new(0.0, 1.0)),
+                        rng.sample(Uniform::new(0.0, 1.0)),
+                        rng.sample(Uniform::new(-5.0, 5.0)),
+                        rng.sample(Uniform::new(0.0, 10.0)),
+                    ))
+                })
+            }
+            .take(10)
+            .collect(),
         };
     }
 
@@ -49,11 +51,25 @@ impl MyEguiApp {
          *
          * Przy przekazywaniu cząsteczek do `net_electrostatic_force` musimy wyrzucić tą, dla
          * której liczymy siłę, żeby nie liczyć oddziaływania elektrostatycznego niej samej ze sobą. */
-        let forces = self.particles
-            .iter().enumerate().map(|(i, p)| p.net_electrostatic_force(self.particles.iter().enumerate().filter(|&(ii, _)| ii != i).map(|(_, p)| p)) + p.gravitational_force())
+        let forces = self
+            .particles
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                p.net_electrostatic_force(
+                    self.particles
+                        .iter()
+                        .enumerate()
+                        .filter(|&(ii, _)| ii != i)
+                        .map(|(_, p)| p),
+                ) + p.gravitational_force()
+            })
             .collect::<Vec<_>>();
 
-        self.particles.iter_mut().zip(forces.iter()).for_each(|(p, f)| p.apply_force(*f, d_time));
+        self.particles
+            .iter_mut()
+            .zip(forces.iter())
+            .for_each(|(p, f)| p.apply_force(*f, d_time));
     }
 }
 
@@ -81,8 +97,12 @@ impl eframe::App for MyEguiApp {
                      * wielkość punktów zależną od ich masy. */
                     plot_ui.points(
                         Points::new(
-                            self.particles.iter().map(|p| [p.position.x as f64, p.position.y as f64]).collect::<Vec<_>>()
-                        ).radius(5.0)
+                            self.particles
+                                .iter()
+                                .map(|p| [p.position.x as f64, p.position.y as f64])
+                                .collect::<Vec<_>>(),
+                        )
+                        .radius(5.0),
                     );
                 });
 
@@ -90,27 +110,83 @@ impl eframe::App for MyEguiApp {
                     // Histogram prędkości
                     ui.heading("Rozkład prędkości");
 
-                    let chart = BarChart::new(Vec::new()).color(Color32::LIGHT_BLUE);
+                    let precision = 0.2;
+
+                    let mut bars: Vec<Bar> = Vec::new();
+                    let values: Vec<f32> = self
+                        .particles
+                        .iter()
+                        .map(|p| (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt())
+                        .map(|v| (v / precision).floor() * precision)
+                        .collect();
+                    for v in values {
+                        let bar = Bar::new((v + precision / 2.0) as f64, 1.0);
+                        let index = bars.iter().position(|b| b.argument == bar.argument);
+                        match index {
+                            None => bars.push(bar),
+                            Some(i) => bars.get_mut(i).unwrap().value += 1.0,
+                        }
+                    }
+
+                    let chart = BarChart::new(bars)
+                        .width(precision as f64)
+                        .color(Color32::LIGHT_BLUE);
                     Plot::new("predkosc")
-                        .view_aspect(1.0)
                         .width(325.0)
+                        .height(325.0)
                         .allow_drag(false)
                         .allow_scroll(false)
                         .allow_zoom(false)
                         .allow_boxed_zoom(false)
+                        .include_x(0)
+                        .include_x(8.0)
+                        .include_y(0)
+                        .include_y(4.0)
+                        .auto_bounds_x()
+                        .auto_bounds_y()
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
 
                     // Histogram energii
                     ui.heading("Rozkład energii");
 
-                    let chart = BarChart::new(Vec::new()).color(Color32::LIGHT_GREEN);
+                    let precision = 1.0;
+
+                    let mut bars: Vec<Bar> = Vec::new();
+                    let values: Vec<f32> = self
+                        .particles
+                        .iter()
+                        .map(|p| {
+                            let velocity = (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt();
+                            let mass = p.mass;
+                            mass * velocity.powi(2) * 0.5
+                        })
+                        .map(|v| (v / precision).floor() * precision)
+                        .collect();
+                    for v in values {
+                        let bar = Bar::new((v + precision / 2.0) as f64, 1.0);
+                        let index = bars.iter().position(|b| b.argument == bar.argument);
+                        match index {
+                            None => bars.push(bar),
+                            Some(i) => bars.get_mut(i).unwrap().value += 1.0,
+                        }
+                    }
+
+                    let chart = BarChart::new(bars)
+                        .width(precision as f64)
+                        .color(Color32::LIGHT_GREEN);
                     Plot::new("energia")
-                        .view_aspect(1.0)
                         .width(325.0)
+                        .height(325.0)
                         .allow_drag(false)
                         .allow_scroll(false)
                         .allow_zoom(false)
                         .allow_boxed_zoom(false)
+                        .include_x(0)
+                        .include_x(32.0)
+                        .include_y(0)
+                        .include_y(4.0)
+                        .auto_bounds_x()
+                        .auto_bounds_y()
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
                 });
 
