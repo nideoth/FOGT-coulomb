@@ -17,7 +17,7 @@ use eframe::{
 
 fn main() {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(1280.0, 720.0)),
+        initial_window_size: Some(egui::vec2(1060.0, 720.0)),
         ..Default::default()
     };
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
@@ -81,7 +81,7 @@ impl eframe::App for MyEguiApp {
                 let markers_plot = Plot::new("markers_demo")
                     .view_aspect(1.0)
                     .width(700.0)
-                    .height(600.0)
+                    .height(700.0)
                     .allow_drag(false)
                     .allow_scroll(false)
                     .allow_zoom(false)
@@ -191,9 +191,9 @@ impl eframe::App for MyEguiApp {
                 });
 
                 // Opcje
-                ui.vertical(|ui| {
-                    ui.heading("Opcje");
-                });
+                //ui.vertical(|ui| {
+                //    ui.heading("Opcje");
+                //});
             });
 
             let d_time = ui.input().stable_dt;
