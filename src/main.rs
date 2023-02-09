@@ -93,17 +93,32 @@ impl eframe::App for MyEguiApp {
                     .include_y(0.0)
                     .include_y(1.0);
                 markers_plot.show(ui, |plot_ui| {
-                    /* TODO: zróbmy żeby ładunki dodatnie i ujemne były w różnych kolorach, i może
-                     * wielkość punktów zależną od ich masy. */
-                    plot_ui.points(
-                        Points::new(
-                            self.particles
-                                .iter()
-                                .map(|p| [p.position.x as f64, p.position.y as f64])
-                                .collect::<Vec<_>>(),
-                        )
-                        .radius(5.0),
-                    );
+                    let max_mass = self
+                        .particles
+                        .iter()
+                        .map(|p| p.mass)
+                        .fold(f32::NAN, f32::max);
+
+                    let max_charge_abs = self
+                        .particles
+                        .iter()
+                        .map(|p| p.charge.abs())
+                        .fold(f32::NAN, f32::max);
+
+                    for p in &self.particles {
+                        let color_value =
+                            (150.0 * p.charge.abs() / max_charge_abs).round() as u8 + 100;
+                        let radius = (5.0 * p.mass / max_mass) + 5.0;
+                        plot_ui.points(
+                            Points::new([p.position.x as f64, p.position.y as f64])
+                                .radius(radius)
+                                .color(if p.charge >= 0.0 {
+                                    Color32::from_rgb(color_value, 0, 0)
+                                } else {
+                                    Color32::from_rgb(0, 0, color_value)
+                                }),
+                        );
+                    }
                 });
 
                 ui.vertical(|ui| {
