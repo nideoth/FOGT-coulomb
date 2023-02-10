@@ -17,7 +17,7 @@ use eframe::{
 
 fn main() {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(1060.0, 720.0)),
+        initial_window_size: Some(egui::vec2(1280.0, 720.0)),
         ..Default::default()
     };
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
@@ -25,6 +25,9 @@ fn main() {
 
 struct MyEguiApp {
     particles: Vec<Particle>,
+    time_multiplier: f32,
+    velocity_precision: f32,
+    energy_precision: f32,
 }
 
 impl MyEguiApp {
@@ -43,6 +46,9 @@ impl MyEguiApp {
             }
             .take(10)
             .collect(),
+            time_multiplier: 1.0,
+            velocity_precision: 0.2,
+            energy_precision: 1.0,
         };
     }
 
@@ -125,17 +131,15 @@ impl eframe::App for MyEguiApp {
                     // Histogram prędkości
                     ui.heading("Rozkład prędkości");
 
-                    let precision = 0.2;
-
                     let mut bars: Vec<Bar> = Vec::new();
                     let values: Vec<f32> = self
                         .particles
                         .iter()
                         .map(|p| (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt())
-                        .map(|v| (v / precision).floor() * precision)
+                        .map(|v| (v / self.velocity_precision).floor() * self.velocity_precision)
                         .collect();
                     for v in values {
-                        let bar = Bar::new((v + precision / 2.0) as f64, 1.0);
+                        let bar = Bar::new((v + self.velocity_precision / 2.0) as f64, 1.0);
                         let index = bars.iter().position(|b| b.argument == bar.argument);
                         match index {
                             None => bars.push(bar),
@@ -144,7 +148,7 @@ impl eframe::App for MyEguiApp {
                     }
 
                     let chart = BarChart::new(bars)
-                        .width(precision as f64)
+                        .width(self.velocity_precision as f64)
                         .color(Color32::LIGHT_BLUE);
                     Plot::new("predkosc")
                         .width(325.0)
@@ -164,8 +168,6 @@ impl eframe::App for MyEguiApp {
                     // Histogram energii
                     ui.heading("Rozkład energii");
 
-                    let precision = 1.0;
-
                     let mut bars: Vec<Bar> = Vec::new();
                     let values: Vec<f32> = self
                         .particles
@@ -175,10 +177,10 @@ impl eframe::App for MyEguiApp {
                             let mass = p.mass;
                             mass * velocity.powi(2) * 0.5
                         })
-                        .map(|v| (v / precision).floor() * precision)
+                        .map(|v| (v / self.energy_precision).floor() * self.energy_precision)
                         .collect();
                     for v in values {
-                        let bar = Bar::new((v + precision / 2.0) as f64, 1.0);
+                        let bar = Bar::new((v + self.energy_precision / 2.0) as f64, 1.0);
                         let index = bars.iter().position(|b| b.argument == bar.argument);
                         match index {
                             None => bars.push(bar),
@@ -187,7 +189,7 @@ impl eframe::App for MyEguiApp {
                     }
 
                     let chart = BarChart::new(bars)
-                        .width(precision as f64)
+                        .width(self.energy_precision as f64)
                         .color(Color32::LIGHT_GREEN);
                     Plot::new("energia")
                         .width(325.0)
@@ -206,12 +208,35 @@ impl eframe::App for MyEguiApp {
                 });
 
                 // Opcje
-                //ui.vertical(|ui| {
-                //    ui.heading("Opcje");
-                //});
+                ui.vertical(|ui| {
+                    ui.heading("Opcje");
+
+                    ui.add_space(16.0);
+                    ui.label("Mnożnik czasu");
+                    ui.add(egui::Slider::new(&mut self.time_multiplier, 0.0..=1.0));
+
+                    ui.add_space(16.0);
+                    ui.label("Precyzja histogramu prędkości");
+                    ui.add(egui::Slider::new(&mut self.velocity_precision, 0.2..=2.0));
+
+                    ui.add_space(16.0);
+                    ui.label("Precyzja histogramu energii");
+                    ui.add(egui::Slider::new(&mut self.energy_precision, 0.4..=4.0));
+
+                    ui.add_space(16.0);
+                    if ui.button("Przywróć domyślne").clicked() {
+                        self.time_multiplier = 1.0;
+                        self.velocity_precision = 0.2;
+                        self.energy_precision = 1.0;
+                    }
+
+                    ui.add_space(16.0);
+                    ui.label("Motyw");
+                    egui::widgets::global_dark_light_mode_buttons(ui);
+                });
             });
 
-            let d_time = ui.input().stable_dt;
+            let d_time = ui.input().stable_dt * self.time_multiplier;
             self.simulation(d_time);
             ui.ctx().request_repaint()
         });
