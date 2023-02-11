@@ -5,22 +5,28 @@ use core::ops::Deref;
 pub type Vect = na::Vector2<f32>;
 
 pub struct Particle {
+    /* Unikalne ID potrzebne do śledzenia cząsteczki. */
+    pub id: u32,
     pub position: Vect,
     pub velocity: Vect,
+    /* Aktualne przyspieszenie na potrzeby rysowania wykresów. */
+    pub acceleration: Vect,
     /* Cząsteczki mają oddziaływać elektrostatycznie i grawitacyjnie. */
     pub charge: f32,
     pub mass: f32,
 }
 
 impl Particle {
-    pub fn new(pos_x: f32, pos_y: f32, charge: f32, mass: f32) -> Self {
+    pub fn new(id: u32, pos_x: f32, pos_y: f32, charge: f32, mass: f32) -> Self {
     /* Aby ustalić skalę wszystkich wielkości w symulacji i dobrze ustawić stałe,
      * wszystkie te wartości muszą być z konkretnych przedziałów. */
         assert!(Self::valid(pos_x, pos_y, charge, mass));
 
         return Self {
+            id,
             position: [pos_x, pos_y].into(),
             velocity: [0.0, 0.0].into(),
+            acceleration: [0.0, 0.0].into(),
             charge,
             mass,
         };
@@ -111,6 +117,7 @@ impl Particle {
 
         self.velocity += d_velocity;
         self.position += d_position;
+        self.acceleration = acceleration;
 
         /* To są współrzędne pudełka ograniczającego ruch cząsteczek.
          * To pewnie nie powinno być zahardcodowane, ale niech na razie

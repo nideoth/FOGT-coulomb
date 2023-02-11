@@ -3,7 +3,7 @@
 
 mod particle;
 
-use particle::Particle;
+use particle::{Particle, Vect};
 use rand::distributions::Uniform;
 use rand::prelude::*;
 extern crate nalgebra as na;
@@ -24,6 +24,11 @@ fn main() {
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
 }
 
+/* TODO: dodać przycisk do restartu symulacji bez wyłączania programu. */
+
+/* Co ma się dziać przy kliknięciu: dodawanie cząsteczek lub śledzenie zaznaczonej cząsteczki. */
+enum ClickAction { Add, Track }
+
 struct MyEguiApp {
     particles: Vec<Particle>,
     time_multiplier: f32,
@@ -32,32 +37,16 @@ struct MyEguiApp {
     rng: ThreadRng,
     /* Parametry wstawiania nowych cząsteczek myszką. */
     user_particle_input_state: UserParticleInputState,
+    /* ID następnej stworzonej cząsteczki. */
+    next_particle_id: u32,
+    /* Aktualnie śledzona cząsteczka. */
+    tracked_particle: Option<TrackedParticle>,
+    click_action: ClickAction,
 }
 
 impl MyEguiApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         return Self {
-            /*
-            particles: {
-                let mut rng = rand::thread_rng();
-                std::iter::from_fn(move || {
-                    Some(Particle::new(
-                        rng.sample(Uniform::new(0.0, 1.0)),
-                        rng.sample(Uniform::new(0.0, 1.0)),
-                        rng.sample(Uniform::new(-1.0, 1.0)),
-                        rng.sample(Uniform::new(0.0, 1.0)),
-                    ))
-                })
-            }
-            .take(4)
-            .collect(),
-            */
-            /*
-            particles: vec![
-                Particle::new(0.5, 0.5, 0.9, 0.5),
-                Particle::new(0.6, 0.5, -0.9, 0.5),
-            ],
-            */
             particles: vec![],
             time_multiplier: 1.0,
             velocity_precision: 0.2,
@@ -68,6 +57,9 @@ impl MyEguiApp {
                 charge: 0.5,
                 mass: 0.5,
             },
+            next_particle_id: 0,
+            tracked_particle: None,
+            click_action: ClickAction::Add,
         };
     }
 
@@ -79,14 +71,11 @@ impl MyEguiApp {
         let forces = self
             .particles
             .iter()
-            .enumerate()
-            .map(|(i, p)| {
+            .map(|p| {
                 p.net_electrostatic_force(
                     self.particles
                         .iter()
-                        .enumerate()
-                        .filter(|&(ii, _)| ii != i)
-                        .map(|(_, p)| p),
+                        .filter(|p2| p.id != p2.id)
                 ) + p.gravitational_force()
             })
             .collect::<Vec<_>>();
@@ -108,7 +97,8 @@ impl MyEguiApp {
             let dy = radius * f32::sin(angle);
 
             if Particle::valid(x + dx, y + dy, input_state.charge, input_state.mass) {
-                self.particles.push(Particle::new(x + dx, y + dy, input_state.charge, input_state.mass));
+                self.particles.push(Particle::new(self.next_particle_id, x + dx, y + dy, input_state.charge, input_state.mass));
+                self.next_particle_id += 1;
             }
         }
     }
@@ -120,9 +110,9 @@ impl eframe::App for MyEguiApp {
          * wartości współrzędnych kursora w układzie współrzędnych wykresu.*/
         let mut particle_plot_pointer_coordinates = None;
 
-        /* Indeks w `self.particles` aktualnie śledzonej cząsteczki, czyli wybranej kursorem. */
-        let mut tracked_particle_index: Option<usize> = None;
-    
+        /* Id cząsteczki aktualnie pod kursorem (może być inna niż aktualnie śledzona). */
+        let mut selected_particle_id: Option<u32> = None;
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Widok cząsteczek
@@ -155,15 +145,16 @@ impl eframe::App for MyEguiApp {
                         let selection_radius = 0.0235;
 
                         /* Szukamy cząsteczki najbliżej kursora i patrzymy, czy jest w promieniu. */
-                        tracked_particle_index = self.particles.iter().enumerate()
-                            .map(|(idx, p)| (idx, (p.position.cast::<f64>() - particle_plot_pointer_coordinates).magnitude()))
+                        selected_particle_id = self.particles.iter()
+                            .map(|p| (p.id, (p.position.cast::<f64>() - particle_plot_pointer_coordinates).magnitude()))
                             .min_by(|(_, d1), (_, d2)| d1.total_cmp(d2))
                             .filter(|(_, d)| d <= &selection_radius)
-                            .map(|(idx, _)| idx);
+                            .map(|(id, _)| id);
+
                     }
 
 
-                    for (idx, p) in self.particles.iter().enumerate() {
+                    for p in &self.particles {
                         /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
 
                         /* Kolor jest skalowany do dozwolonego przedziału ładunku, a nie do
@@ -172,16 +163,19 @@ impl eframe::App for MyEguiApp {
                          * nowa przeliczać jeśli zmieni się maksimum. */
                         let color_value = 
                             /* Śledzona cząsteczka ma się wyróżniać. */
-                            if tracked_particle_index.is_some() && tracked_particle_index.unwrap() == idx {
+                            if self.tracked_particle.is_some() && self.tracked_particle.as_ref().unwrap().id == p.id {
+                                Color32::from_rgb(0, 255, 255)
+                            /* Zaznaczona też. */
+                            } else if selected_particle_id.is_some() && selected_particle_id.unwrap() == p.id {
                                 Color32::from_rgb(255, 255, 0)
                             } else {
                                 if p.charge >= 0.0 {
-                                /* "Casting from a float to an integer will round the float towards zero". */
-                                Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
-                            } else {
-                                Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
-                            }
-                        };
+                                    /* "Casting from a float to an integer will round the float towards zero". */
+                                    Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
+                                } else {
+                                    Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
+                                }
+                            };
 
                         /* Analogiczny komentarz jak dla ładunku. */
                         let radius = 7.0 * p.mass + 3.0;
@@ -417,13 +411,51 @@ impl eframe::App for MyEguiApp {
                         });
 
                     }
+
+                    ui.add_space(16.0);
+                    if ui.button("Wstawianie").clicked() {
+                        self.click_action = ClickAction::Add;
+                    }
+
+                    if ui.button("Śledzenie").clicked() {
+                        self.click_action = ClickAction::Track;
+                    }
+
+                    /* Wykresy dla śledzonej cząsteczki. */
+                    {
+                        let plot_size = 150.0;
+
+                        let path_plot = Plot::new("path")
+                            .view_aspect(1.0)
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .include_y(0.0)
+                            .include_y(1.0)
+                            .show_axes([false, false]);
+                    }
+
                 });
             });
 
-            /* Dodawanie cząsteczek przez kliknięcie. */
-            if ui.input().pointer.primary_clicked()  {
-                if let Some(egui::widgets::plot::PlotPoint{x, y}) = particle_plot_pointer_coordinates {
-                    self.add_user_particles(x as f32, y as f32, self.user_particle_input_state);
+            /* Dodawanie cząsteczek przez kliknięcie lub śledzenie cząsteczki. */
+            if ui.input().pointer.primary_clicked() {
+                match self.click_action {
+                    ClickAction::Add => {
+                        if let Some(egui::widgets::plot::PlotPoint{x, y}) = particle_plot_pointer_coordinates {
+                            self.add_user_particles(x as f32, y as f32, self.user_particle_input_state);
+                        }
+                    },
+                    ClickAction::Track => {
+                        if let Some(id) = selected_particle_id {
+                            self.tracked_particle = Some(TrackedParticle::new(id));
+                        }
+                    }
                 }
             }
 
@@ -441,4 +473,24 @@ struct UserParticleInputState {
     count: u32,
     charge: f32,
     mass: f32,
+}
+
+/* Wszystkie punkty danych potrzebne do zrobienia wykresów dla śledzonej cząsteczki. */
+#[derive(Debug)]
+struct TrackedParticle {
+    id: u32,
+    path: std::collections::VecDeque<Vect>,
+    velocity: std::collections::VecDeque<Vect>,
+    acceleration: std::collections::VecDeque<Vect>,
+}
+
+impl TrackedParticle {
+    fn new(id: u32) -> Self {
+        return Self{
+            id,
+            path: std::collections::VecDeque::new(),
+            velocity: std::collections::VecDeque::new(),
+            acceleration: std::collections::VecDeque::new(),
+        };
+    }
 }
