@@ -25,6 +25,11 @@ fn main() {
 }
 
 /* TODO: dodać przycisk do restartu symulacji bez wyłączania programu. */
+/* TODO: trzeba wymyślić lepszy schemat kolorów dla cząsteczek, bo im mniejszy ładunek tym bardziej
+ * czarne one są, i nie widać ich na tle wykresu. */
+/* TODO: poprawić layout UI, żeby wszystkie wykresy się mieściły (zakładki?) */
+
+
 
 /* Co ma się dziać przy kliknięciu: dodawanie cząsteczek lub śledzenie zaznaczonej cząsteczki. */
 enum ClickAction { Add, Track }
