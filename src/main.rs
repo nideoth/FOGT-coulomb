@@ -84,6 +84,27 @@ impl MyEguiApp {
             .iter_mut()
             .zip(forces.iter())
             .for_each(|(p, f)| p.apply_force(*f, d_time));
+
+        /* Zapisujemy dane śledzonej cząsteczki z tej instancji symulacji do narysowania wykresów. */
+        if let Some(ref mut tracked_particle) = self.tracked_particle {
+            if let Some(particle) = self.particles.iter().find(|p| p.id == tracked_particle.id) {
+                if tracked_particle.path.len() == TrackedParticle::DATA_POINT_COUNT_PATH {
+                    tracked_particle.path.pop_front();
+                }
+
+                if tracked_particle.velocity.len() == TrackedParticle::DATA_POINT_COUNT_VELOCITY {
+                    tracked_particle.velocity.pop_front();
+                }
+
+                if tracked_particle.acceleration.len() == TrackedParticle::DATA_POINT_COUNT_ACCELERATION {
+                    tracked_particle.acceleration.pop_front();
+                }
+
+                tracked_particle.path.push_back(particle.position);
+                tracked_particle.velocity.push_back(particle.velocity);
+                tracked_particle.acceleration.push_back(particle.acceleration);
+            }
+        }
     }
 
     /* Dodawanie cząsteczek przez kliknięcie myszką. */
@@ -372,7 +393,9 @@ impl eframe::App for MyEguiApp {
                     /* Jak się okazuje, nie ma chyba analogicznej wielkości dla ładunku, którą
                      * można policzyć bez ogromnego wysiłku. */
                     {
-                        let plot_size = 100.0;
+                        /* TODO: To trzeba powiększyć, ale przy aktualnym układzie nie mieści mi
+                         * się więcej wykresów na ekranie. */
+                        let plot_size = 20.0;
 
                         let center_of_mass_plot = Plot::new("center_of_mass")
                             .view_aspect(1.0)
@@ -422,10 +445,13 @@ impl eframe::App for MyEguiApp {
                     }
 
                     /* Wykresy dla śledzonej cząsteczki. */
-                    {
-                        let plot_size = 150.0;
+                    if let Some(ref tracked_particle) = self.tracked_particle {
+                        /* TODO: To trzeba powiększyć, ale przy aktualnym układzie nie mieści mi
+                         * się więcej wykresów na ekranie. */
+                        let plot_size = 50.0;
 
-                        let path_plot = Plot::new("path")
+                        /* Ścieżka ruchu. */
+                        let path_plot = Plot::new("tracked_path")
                             .view_aspect(1.0)
                             .width(plot_size)
                             .height(plot_size)
@@ -438,6 +464,60 @@ impl eframe::App for MyEguiApp {
                             .include_y(0.0)
                             .include_y(1.0)
                             .show_axes([false, false]);
+
+                        path_plot.show(ui, |plot_ui| {
+                            plot_ui.line(
+                                egui::widgets::plot::Line::new(egui::widgets::plot::PlotPoints::from_iter(
+                                    tracked_particle.path
+                                    .iter()
+                                    .map(|a| [a.x as f64, a.y as f64])
+                                )).color(Color32::from_rgb(255, 255, 255))
+                            )
+                        });
+
+                        /* Prędkość. */
+                        let velocity_plot = Plot::new("tracked_velocity")
+                            .view_aspect(1.0)
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false);
+
+                        velocity_plot.show(ui, |plot_ui| {
+                            plot_ui.line(
+                                egui::widgets::plot::Line::new(egui::widgets::plot::PlotPoints::from_iter(
+                                    tracked_particle.velocity
+                                    .iter()
+                                    .zip(0..TrackedParticle::DATA_POINT_COUNT_VELOCITY)
+                                    .map(|(y, x)| [x as f64 / TrackedParticle::DATA_POINT_COUNT_VELOCITY as f64, y.magnitude() as f64])
+                                )).color(Color32::from_rgb(255, 255, 255))
+                            )
+                        });
+
+                        /* Przyspieszenie. */
+                        let acceleration_plot = Plot::new("tracked_acceleration")
+                            .view_aspect(1.0)
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false);
+
+                        acceleration_plot.show(ui, |plot_ui| {
+                            plot_ui.line(
+                                egui::widgets::plot::Line::new(egui::widgets::plot::PlotPoints::from_iter(
+                                    tracked_particle.acceleration
+                                    .iter()
+                                    .zip(0..TrackedParticle::DATA_POINT_COUNT_ACCELERATION)
+                                    .map(|(y, x)| [x as f64 / TrackedParticle::DATA_POINT_COUNT_ACCELERATION as f64, y.magnitude() as f64])
+                                )).color(Color32::from_rgb(255, 255, 255))
+                            )
+                        });
+
+
                     }
 
                 });
@@ -485,12 +565,17 @@ struct TrackedParticle {
 }
 
 impl TrackedParticle {
+    /* Dla ilu chwil czasu chcemy trzymać wartości. */
+    const DATA_POINT_COUNT_PATH: usize = 1024;
+    const DATA_POINT_COUNT_VELOCITY: usize = 256;
+    const DATA_POINT_COUNT_ACCELERATION: usize = 256;
+
     fn new(id: u32) -> Self {
         return Self{
             id,
-            path: std::collections::VecDeque::new(),
-            velocity: std::collections::VecDeque::new(),
-            acceleration: std::collections::VecDeque::new(),
+            path: std::collections::VecDeque::with_capacity(Self::DATA_POINT_COUNT_PATH),
+            velocity: std::collections::VecDeque::with_capacity(Self::DATA_POINT_COUNT_VELOCITY),
+            acceleration: std::collections::VecDeque::with_capacity(Self::DATA_POINT_COUNT_ACCELERATION),
         };
     }
 }
