@@ -323,7 +323,7 @@ impl eframe::App for MyEguiApp {
 
                     ui.add_space(16.0);
                     ui.add(egui::Slider::from_get_set(
-                        std::ops::RangeInclusive::new(0.1, 1.0),
+                        std::ops::RangeInclusive::new(0.01, 1.0),
                         |x| { 
                             if let Some(x) = x { 
                                 self.user_particle_input_state.mass = x as f32; 

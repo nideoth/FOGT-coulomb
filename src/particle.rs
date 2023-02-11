@@ -34,13 +34,12 @@ impl Particle {
             0.0 < mass && mass <= 1.0;
     }
 
-
     /* Wektor siły oddziaływania elektrostatycznego z cząsteczką `other`. */
     pub fn electrostatic_force(&self, other: &Particle) -> Vect {
         /* Wartości stałych możemy raczej dobrać na wyczucie,
          * bo wszystkie wielkości fizyczne w tej symulacji są
          * bez jednostek. */
-        const K: f32 = 1.5;
+        const ELECTRO_K: f32 = 1.5;
 
         let r = self.position - other.position;
         let r_len_sq = r.magnitude_squared();
@@ -56,7 +55,7 @@ impl Particle {
         if !r_len_sq.is_finite() || r_len_sq < EPS {
             return Vect::zeros();
         } else {
-            return K * self.charge * other.charge * r / r_len_sq;
+            return ELECTRO_K * self.charge * other.charge * r / r_len_sq;
         }
     }
 
@@ -76,9 +75,9 @@ impl Particle {
     pub fn gravitational_force(&self) -> Vect {
         /* Tak jak wcześniej, wszystkie stałe można zastąpić jedną, więc
          * grawitacja będzie po prostu proporcjonalna do masy */
-        const K: f32 = 8.0;
+        const GRAVITY_K: f32 = 8.0;
 
-        return Vect::from([0.0, -K * self.mass]);
+        return Vect::from([0.0, -GRAVITY_K * self.mass]);
     }
 
     /* Uaktualnia prędkość i pozycję `self` pod wpływem działania siły `force`
