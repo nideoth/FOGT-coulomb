@@ -313,13 +313,23 @@ impl eframe::App for MyEguiApp {
                     ui.add_space(16.0);
                     ui.add(egui::Slider::from_get_set(
                         std::ops::RangeInclusive::new(-1.0, 1.0),
-                        |x| {if let Some(x) = x { self.user_particle_input_state.charge = x as f32; } self.user_particle_input_state.charge as f64 }
+                        |x| { 
+                            if let Some(x) = x { 
+                                self.user_particle_input_state.charge = x as f32; 
+                            } 
+                            self.user_particle_input_state.charge as f64 
+                        }
                     ).text("Ładunek").clamp_to_range(true));
 
                     ui.add_space(16.0);
                     ui.add(egui::Slider::from_get_set(
                         std::ops::RangeInclusive::new(0.1, 1.0),
-                        |x| {if let Some(x) = x { self.user_particle_input_state.mass = x as f32; } self.user_particle_input_state.mass as f64 }
+                        |x| { 
+                            if let Some(x) = x { 
+                                self.user_particle_input_state.mass = x as f32; 
+                            } 
+                            self.user_particle_input_state.mass as f64 
+                        }
                     ).text("Masa").clamp_to_range(true));
 
 
