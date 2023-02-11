@@ -39,13 +39,19 @@ impl MyEguiApp {
                     Some(Particle::new(
                         rng.sample(Uniform::new(0.0, 1.0)),
                         rng.sample(Uniform::new(0.0, 1.0)),
-                        rng.sample(Uniform::new(-5.0, 5.0)),
-                        rng.sample(Uniform::new(0.0, 10.0)),
+                        rng.sample(Uniform::new(-1.0, 1.0)),
+                        rng.sample(Uniform::new(0.0, 1.0)),
                     ))
                 })
             }
-            .take(10)
+            .take(4)
             .collect(),
+            /*
+            particles: vec![
+                Particle::new(0.5, 0.5, 0.9, 0.5),
+                Particle::new(0.6, 0.5, -0.9, 0.5),
+            ],
+            */
             time_multiplier: 1.0,
             velocity_precision: 0.2,
             energy_precision: 1.0,
@@ -87,7 +93,9 @@ impl eframe::App for MyEguiApp {
                 let markers_plot = Plot::new("markers_demo")
                     .view_aspect(1.0)
                     .width(700.0)
-                    .height(700.0)
+                    /* TODO: to powinien być kwadrat, ale wtedy ne mieści mi się na ekranie... */
+                    //.height(700.0)
+                    .height(600.0)
                     .allow_drag(false)
                     .allow_scroll(false)
                     .allow_zoom(false)
@@ -99,30 +107,26 @@ impl eframe::App for MyEguiApp {
                     .include_y(0.0)
                     .include_y(1.0);
                 markers_plot.show(ui, |plot_ui| {
-                    let max_mass = self
-                        .particles
-                        .iter()
-                        .map(|p| p.mass)
-                        .fold(f32::NAN, f32::max);
-
-                    let max_charge_abs = self
-                        .particles
-                        .iter()
-                        .map(|p| p.charge.abs())
-                        .fold(f32::NAN, f32::max);
+                    /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
 
                     for p in &self.particles {
-                        let color_value =
-                            (150.0 * p.charge.abs() / max_charge_abs).round() as u8 + 100;
-                        let radius = (5.0 * p.mass / max_mass) + 5.0;
+                        /* Moim zdaniem lepiej, żeby kolor był bezwzględny, a nie skalowany do
+                         * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak byśmy chcieli
+                         * dodać nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
+                         * nowa przeliczać jeśli zmieni się maksimum. */
+                        let color_value = if p.charge >= 0.0 {
+                            /* "Casting from a float to an integer will round the float towards zero". */
+                            Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
+                        } else {
+                            Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
+                        };
+
+                        /* Analogiczny komentarz jak dla ładunku. */
+                        let radius = 7.0 * p.mass + 3.0;
                         plot_ui.points(
                             Points::new([p.position.x as f64, p.position.y as f64])
                                 .radius(radius)
-                                .color(if p.charge >= 0.0 {
-                                    Color32::from_rgb(color_value, 0, 0)
-                                } else {
-                                    Color32::from_rgb(0, 0, color_value)
-                                }),
+                                .color(color_value),
                         );
                     }
                 });
@@ -131,6 +135,43 @@ impl eframe::App for MyEguiApp {
                     // Histogram prędkości
                     ui.heading("Rozkład prędkości");
 
+                    /* Przykład tego co miałem na myśli gdy mówiłem o tym, żeby ten histogram był
+                     * posortowany. */
+
+                    let mut velocities: Vec<_> = self.particles
+                        .iter()
+                        .map(|p| if p.velocity.magnitude().is_finite() { p.velocity.magnitude() } else { 0.0 } )
+                        .collect();
+
+                    /* Floaty nie implementują `Ord` bo NaN != NaN. */
+                    velocities.sort_by(|a, b| a.total_cmp(b));
+
+                    let bars: Vec<_> = velocities
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &v)| Bar::new((i + 1) as f64, v as f64))
+                        .collect();
+
+                    let chart_size = 325.0; /* Szerokość i wysokość. */
+                    let y_range = 6.0;
+
+                    let chart = BarChart::new(bars)
+                        .width(1.0)
+                        .color(Color32::LIGHT_BLUE);
+
+                    Plot::new("predkosc")
+                        .width(chart_size)
+                        .height(chart_size)
+                        .allow_drag(false)
+                        .allow_scroll(false)
+                        .allow_zoom(false)
+                        .allow_boxed_zoom(false)
+                        .include_y(0)
+                        .include_y(y_range)
+                        .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+
+
+                    /*
                     let mut bars: Vec<Bar> = Vec::new();
                     let values: Vec<f32> = self
                         .particles
@@ -146,7 +187,9 @@ impl eframe::App for MyEguiApp {
                             Some(i) => bars.get_mut(i).unwrap().value += 1.0,
                         }
                     }
+                    */
 
+                    /*
                     let chart = BarChart::new(bars)
                         .width(self.velocity_precision as f64)
                         .color(Color32::LIGHT_BLUE);
@@ -161,9 +204,12 @@ impl eframe::App for MyEguiApp {
                         .include_x(8.0)
                         .include_y(0)
                         .include_y(4.0)
+                        /* Tych dwóch właśnie chyba powinno nie być, skoro ustawiamy na sztywno zakres:
                         .auto_bounds_x()
                         .auto_bounds_y()
+                        */
                         .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+                        */
 
                     // Histogram energii
                     ui.heading("Rozkład energii");
