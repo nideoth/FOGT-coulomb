@@ -31,7 +31,7 @@ impl Particle {
             0.0 <= pos_x && pos_x <= 1.0 &&
             0.0 <= pos_y && pos_y <= 1.0 &&
             -1.0 <= charge && charge <= 1.0 &&
-            0.0 <= mass && mass <= 1.0;
+            0.0 < mass && mass <= 1.0;
     }
 
 

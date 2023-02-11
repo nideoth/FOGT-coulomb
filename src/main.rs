@@ -63,7 +63,7 @@ impl MyEguiApp {
             energy_precision: 1.0,
             rng: rand::thread_rng(),
             user_particle_input_state: UserParticleInputState{
-                count: 10,
+                count: 1,
                 charge: 0.5,
                 mass: 0.5,
             },
@@ -303,6 +303,26 @@ impl eframe::App for MyEguiApp {
                     ui.add_space(16.0);
                     ui.label("Precyzja histogramu energii");
                     ui.add(egui::Slider::new(&mut self.energy_precision, 0.4..=4.0));
+
+                    /* Opcje wstawiania cząsteczek myszką. */
+                    ui.heading("Wstawianie cząsteczek");
+
+                    ui.add_space(16.0);
+                    ui.add(egui::Slider::new(&mut self.user_particle_input_state.count, 1..=10).text("Ilość").clamp_to_range(false));
+
+                    ui.add_space(16.0);
+                    ui.add(egui::Slider::from_get_set(
+                        std::ops::RangeInclusive::new(-1.0, 1.0),
+                        |x| {if let Some(x) = x { self.user_particle_input_state.charge = x as f32; } self.user_particle_input_state.charge as f64 }
+                    ).text("Ładunek").clamp_to_range(true));
+
+                    ui.add_space(16.0);
+                    ui.add(egui::Slider::from_get_set(
+                        std::ops::RangeInclusive::new(0.1, 1.0),
+                        |x| {if let Some(x) = x { self.user_particle_input_state.mass = x as f32; } self.user_particle_input_state.mass as f64 }
+                    ).text("Masa").clamp_to_range(true));
+
+
 
                     ui.add_space(16.0);
                     if ui.button("Przywróć domyślne").clicked() {
