@@ -6,6 +6,7 @@ mod particle;
 use particle::Particle;
 use rand::distributions::Uniform;
 use rand::prelude::*;
+extern crate nalgebra as na;
 
 use eframe::{
     egui::{
@@ -118,6 +119,9 @@ impl eframe::App for MyEguiApp {
         /* Potrzebne do obliczania współrzędnych przy dodawaniu cząsteczek myszką:
          * wartości współrzędnych kursora w układzie współrzędnych wykresu.*/
         let mut particle_plot_pointer_coordinates = None;
+
+        /* Indeks w `self.particles` aktualnie śledzonej cząsteczki, czyli wybranej kursorem. */
+        let mut tracked_particle_index: Option<usize> = None;
     
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -140,18 +144,43 @@ impl eframe::App for MyEguiApp {
                     .include_y(1.0);
 
                 markers_plot.show(ui, |plot_ui| {
-                    for p in &self.particles {
+                    particle_plot_pointer_coordinates = plot_ui.pointer_coordinate();
+
+                    /* Szukamy indeksu cząsteczki pod kursorem. */
+                    if let Some(particle_plot_pointer_coordinates) = particle_plot_pointer_coordinates {
+                        let particle_plot_pointer_coordinates = na::Vector2::<f64>::new(particle_plot_pointer_coordinates.x, particle_plot_pointer_coordinates.y);
+
+                        /* Jeśli kursor znajduje się w co najwyżej takiej odległości od środka
+                         * cząsteczki, to uznajemy, że jest na cząsteczce. */
+                        let selection_radius = 0.0235;
+
+                        /* Szukamy cząsteczki najbliżej kursora i patrzymy, czy jest w promieniu. */
+                        tracked_particle_index = self.particles.iter().enumerate()
+                            .map(|(idx, p)| (idx, (p.position.cast::<f64>() - particle_plot_pointer_coordinates).magnitude()))
+                            .min_by(|(_, d1), (_, d2)| d1.total_cmp(d2))
+                            .filter(|(_, d)| d <= &selection_radius)
+                            .map(|(idx, _)| idx);
+                    }
+
+
+                    for (idx, p) in self.particles.iter().enumerate() {
                         /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
 
-                        /* Moim zdaniem lepiej, żeby kolor był bezwzględny, a nie skalowany do
-                         * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak byśmy chcieli
-                         * dodać nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
+                        /* Kolor jest skalowany do dozwolonego przedziału ładunku, a nie do
+                         * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak dodajemy
+                         * nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
                          * nowa przeliczać jeśli zmieni się maksimum. */
-                        let color_value = if p.charge >= 0.0 {
-                            /* "Casting from a float to an integer will round the float towards zero". */
-                            Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
-                        } else {
-                            Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
+                        let color_value = 
+                            /* Śledzona cząsteczka ma się wyróżniać. */
+                            if tracked_particle_index.is_some() && tracked_particle_index.unwrap() == idx {
+                                Color32::from_rgb(255, 255, 0)
+                            } else {
+                                if p.charge >= 0.0 {
+                                /* "Casting from a float to an integer will round the float towards zero". */
+                                Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
+                            } else {
+                                Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
+                            }
                         };
 
                         /* Analogiczny komentarz jak dla ładunku. */
@@ -163,7 +192,6 @@ impl eframe::App for MyEguiApp {
                         );
                     }
 
-                    particle_plot_pointer_coordinates = plot_ui.pointer_coordinate();
                 });
 
                 ui.vertical(|ui| {

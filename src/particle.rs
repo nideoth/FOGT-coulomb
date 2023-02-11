@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 use core::ops::Deref;
 
 /* Zwykły wektor 2D, żeby nie pisać tego tyle razy. */
-type Vect = na::Vector2<f32>;
+pub type Vect = na::Vector2<f32>;
 
 pub struct Particle {
     pub position: Vect,
