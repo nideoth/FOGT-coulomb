@@ -16,10 +16,7 @@ impl Particle {
     pub fn new(pos_x: f32, pos_y: f32, charge: f32, mass: f32) -> Self {
     /* Aby ustalić skalę wszystkich wielkości w symulacji i dobrze ustawić stałe,
      * wszystkie te wartości muszą być z konkretnych przedziałów. */
-        assert!(0.0 <= pos_x && pos_x <= 1.0);
-        assert!(0.0 <= pos_y && pos_y <= 1.0);
-        assert!(-1.0 <= charge && charge <= 1.0);
-        assert!(0.0 <= mass && mass <= 1.0);
+        assert!(Self::valid(pos_x, pos_y, charge, mass));
 
         return Self {
             position: [pos_x, pos_y].into(),
@@ -28,6 +25,15 @@ impl Particle {
             mass,
         };
     }
+
+    pub fn valid(pos_x: f32, pos_y: f32, charge: f32, mass: f32) -> bool {
+        return
+            0.0 <= pos_x && pos_x <= 1.0 &&
+            0.0 <= pos_y && pos_y <= 1.0 &&
+            -1.0 <= charge && charge <= 1.0 &&
+            0.0 <= mass && mass <= 1.0;
+    }
+
 
     /* Wektor siły oddziaływania elektrostatycznego z cząsteczką `other`. */
     pub fn electrostatic_force(&self, other: &Particle) -> Vect {

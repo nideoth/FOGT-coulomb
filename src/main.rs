@@ -28,11 +28,15 @@ struct MyEguiApp {
     time_multiplier: f32,
     velocity_precision: f32,
     energy_precision: f32,
+    rng: ThreadRng,
+    /* Parametry wstawiania nowych cząsteczek myszką. */
+    user_particle_input_state: UserParticleInputState,
 }
 
 impl MyEguiApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         return Self {
+            /*
             particles: {
                 let mut rng = rand::thread_rng();
                 std::iter::from_fn(move || {
@@ -46,15 +50,23 @@ impl MyEguiApp {
             }
             .take(4)
             .collect(),
+            */
             /*
             particles: vec![
                 Particle::new(0.5, 0.5, 0.9, 0.5),
                 Particle::new(0.6, 0.5, -0.9, 0.5),
             ],
             */
+            particles: vec![],
             time_multiplier: 1.0,
             velocity_precision: 0.2,
             energy_precision: 1.0,
+            rng: rand::thread_rng(),
+            user_particle_input_state: UserParticleInputState{
+                count: 10,
+                charge: 0.5,
+                mass: 0.5,
+            },
         };
     }
 
@@ -83,17 +95,37 @@ impl MyEguiApp {
             .zip(forces.iter())
             .for_each(|(p, f)| p.apply_force(*f, d_time));
     }
+
+    /* Dodawanie cząsteczek przez kliknięcie myszką. */
+    fn add_user_particles(&mut self, x: f32, y: f32, input_state: UserParticleInputState) {
+        for _ in 0..input_state.count {
+            /* Jeśli jedna cząsteczka, wstawiamy ją dokładnie tam, gdzie jest kursor. 
+             * Jeśli więcej, to dodajemy pewien rozrzut, bo inaczej wszystkie by się pokryły. */
+            let radius = self.rng.sample(Uniform::new(0.0, 1.0)) * u32::min(input_state.count - 1, 1) as f32 * 0.1;
+            let angle = self.rng.sample(Uniform::new(0.0, std::f32::consts::PI * 2.0));
+            let dx = radius * f32::cos(angle);
+            let dy = radius * f32::sin(angle);
+
+            if Particle::valid(x + dx, y + dy, input_state.charge, input_state.mass) {
+                self.particles.push(Particle::new(x + dx, y + dy, input_state.charge, input_state.mass));
+            }
+        }
+    }
 }
 
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        /* Potrzebne do obliczania współrzędnych przy dodawaniu cząsteczek myszką:
+         * wartości współrzędnych kursora w układzie współrzędnych wykresu.*/
+        let mut particle_plot_pointer_coordinates = None;
+    
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Widok cząsteczek
                 let markers_plot = Plot::new("markers_demo")
                     .view_aspect(1.0)
                     .width(700.0)
-                    /* TODO: to powinien być kwadrat, ale wtedy ne mieści mi się na ekranie... */
+                    /* TODO: to powinien być kwadrat, ale wtedy nie mieści mi się na ekranie... */
                     //.height(700.0)
                     .height(600.0)
                     .allow_drag(false)
@@ -106,10 +138,11 @@ impl eframe::App for MyEguiApp {
                     .include_x(1.0)
                     .include_y(0.0)
                     .include_y(1.0);
-                markers_plot.show(ui, |plot_ui| {
-                    /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
 
+                markers_plot.show(ui, |plot_ui| {
                     for p in &self.particles {
+                        /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
+
                         /* Moim zdaniem lepiej, żeby kolor był bezwzględny, a nie skalowany do
                          * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak byśmy chcieli
                          * dodać nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
@@ -129,6 +162,8 @@ impl eframe::App for MyEguiApp {
                                 .color(color_value),
                         );
                     }
+
+                    particle_plot_pointer_coordinates = plot_ui.pointer_coordinate();
                 });
 
                 ui.vertical(|ui| {
@@ -282,9 +317,25 @@ impl eframe::App for MyEguiApp {
                 });
             });
 
+            /* Dodawanie cząsteczek przez kliknięcie. */
+            if ui.input().pointer.primary_clicked()  {
+                if let Some(egui::widgets::plot::PlotPoint{x, y}) = particle_plot_pointer_coordinates {
+                    self.add_user_particles(x as f32, y as f32, self.user_particle_input_state);
+                }
+            }
+
+
             let d_time = ui.input().stable_dt * self.time_multiplier;
             self.simulation(d_time);
             ui.ctx().request_repaint()
         });
     }
+}
+
+/* Parametry wstawiania nowych cząsteczek myszką. */
+#[derive(Copy, Clone)]
+struct UserParticleInputState {
+    count: u32,
+    charge: f32,
+    mass: f32,
 }
