@@ -344,6 +344,51 @@ impl eframe::App for MyEguiApp {
                     ui.add_space(16.0);
                     ui.label("Motyw");
                     egui::widgets::global_dark_light_mode_buttons(ui);
+
+                    /* Wykres środka ciężkości. */
+
+                    /* Jak się okazuje, nie ma chyba analogicznej wielkości dla ładunku, którą
+                     * można policzyć bez ogromnego wysiłku. */
+                    {
+                        let plot_size = 100.0;
+
+                        let center_of_mass_plot = Plot::new("center_of_mass")
+                            .view_aspect(1.0)
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .include_y(0.0)
+                            .include_y(1.0)
+                            .show_axes([false, false]);
+
+
+                        ui.label("Środek masy");
+                        
+                        center_of_mass_plot.show(ui, |plot_ui| {
+                            if let Some(center_of_mass) = Particle::center_of_mass(self.particles.iter()) {
+                                plot_ui.points(
+                                    Points::new([center_of_mass.x as f64, center_of_mass.y as f64])
+                                        .radius(2.0)
+                                        .color(Color32::from_rgb(255, 255, 255))
+                                );
+                            }
+
+                            plot_ui.text(
+                                egui::widgets::plot::Text::new(
+                                    egui::widgets::plot::PlotPoint{x: 0.0, y: 1.0},
+                                    format!("Całkowita masa: {}", self.particles.iter().map(|p| p.mass).sum::<f32>())
+                                )
+                                .anchor(egui::Align2::LEFT_TOP)
+                                .color(Color32::from_rgb(255, 255, 255))
+                            );
+                        });
+
+                    }
                 });
             });
 

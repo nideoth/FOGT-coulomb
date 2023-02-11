@@ -142,4 +142,13 @@ impl Particle {
             self.velocity.y *= -1.0;
         }
     }
+
+    /* Środek masy systemu cząsteczek. */
+    pub fn center_of_mass<'a>(particles: impl Iterator<Item = &'a Particle>) -> Option<Vect> {
+        let mut total_mass = 0.0;
+        let position = particles.fold(Vect::zeros(), |acc, p| { total_mass += p.mass; acc + p.position * p.mass });
+
+        return if total_mass != 0.0 { Some(position / total_mass) } 
+        else { None };
+    }
 }
