@@ -140,268 +140,330 @@ impl eframe::App for MyEguiApp {
         let mut selected_particle_id: Option<u32> = None;
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            /* Wielkość okienka z symulacją. */
+            let simulation_plot_size = 500.0;
+            /* Wielkość pozostałych wykresów. */
+            let plot_size = 200.0;
+
             ui.horizontal(|ui| {
-                // Widok cząsteczek
-                let markers_plot = Plot::new("markers_demo")
-                    .view_aspect(1.0)
-                    .width(700.0)
-                    /* TODO: to powinien być kwadrat, ale wtedy nie mieści mi się na ekranie... */
-                    //.height(700.0)
-                    .height(600.0)
-                    .allow_drag(false)
-                    .allow_scroll(false)
-                    .allow_zoom(false)
-                    .allow_boxed_zoom(false)
-                    /* To jest potrzebne, żeby skala wykresu nie próbowała się ciągle dopasowywać
-                     * do rozmieszczenia cząsteczek. */
-                    .include_x(0.0)
-                    .include_x(1.0)
-                    .include_y(0.0)
-                    .include_y(1.0);
-
-                markers_plot.show(ui, |plot_ui| {
-                    particle_plot_pointer_coordinates = plot_ui.pointer_coordinate();
-
-                    /* Szukamy indeksu cząsteczki pod kursorem. */
-                    if let Some(particle_plot_pointer_coordinates) = particle_plot_pointer_coordinates {
-                        let particle_plot_pointer_coordinates = na::Vector2::<f64>::new(particle_plot_pointer_coordinates.x, particle_plot_pointer_coordinates.y);
-
-                        /* Jeśli kursor znajduje się w co najwyżej takiej odległości od środka
-                         * cząsteczki, to uznajemy, że jest na cząsteczce. */
-                        let selection_radius = 0.0235;
-
-                        /* Szukamy cząsteczki najbliżej kursora i patrzymy, czy jest w promieniu. */
-                        selected_particle_id = self.particles.iter()
-                            .map(|p| (p.id, (p.position.cast::<f64>() - particle_plot_pointer_coordinates).magnitude()))
-                            .min_by(|(_, d1), (_, d2)| d1.total_cmp(d2))
-                            .filter(|(_, d)| d <= &selection_radius)
-                            .map(|(id, _)| id);
-
-                    }
-
-
-                    for p in &self.particles {
-                        /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
-
-                        /* Kolor jest skalowany do dozwolonego przedziału ładunku, a nie do
-                         * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak dodajemy
-                         * nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
-                         * nowa przeliczać jeśli zmieni się maksimum. */
-                        let color_value = 
-                            /* Śledzona cząsteczka ma się wyróżniać. */
-                            if self.tracked_particle.is_some() && self.tracked_particle.as_ref().unwrap().id == p.id {
-                                Color32::from_rgb(0, 255, 255)
-                            /* Zaznaczona też. */
-                            } else if selected_particle_id.is_some() && selected_particle_id.unwrap() == p.id {
-                                Color32::from_rgb(255, 255, 0)
-                            } else {
-                                if p.charge >= 0.0 {
-                                    /* "Casting from a float to an integer will round the float towards zero". */
-                                    Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
-                                } else {
-                                    Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
-                                }
-                            };
-
-                        /* Analogiczny komentarz jak dla ładunku. */
-                        let radius = 7.0 * p.mass + 3.0;
-                        plot_ui.points(
-                            Points::new([p.position.x as f64, p.position.y as f64])
-                                .radius(radius)
-                                .color(color_value),
-                        );
-                    }
-
-                });
-
                 ui.vertical(|ui| {
-                    // Histogram prędkości
-                    ui.heading("Rozkład prędkości");
-
-                    /* Przykład tego co miałem na myśli gdy mówiłem o tym, żeby ten histogram był
-                     * posortowany. */
-
-                    let mut velocities: Vec<_> = self.particles
-                        .iter()
-                        .map(|p| if p.velocity.magnitude().is_finite() { p.velocity.magnitude() } else { 0.0 } )
-                        .collect();
-
-                    /* Floaty nie implementują `Ord` bo NaN != NaN. */
-                    velocities.sort_by(|a, b| a.total_cmp(b));
-
-                    let bars: Vec<_> = velocities
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &v)| Bar::new((i + 1) as f64, v as f64))
-                        .collect();
-
-                    let chart_size = 325.0; /* Szerokość i wysokość. */
-                    let y_range = 6.0;
-
-                    let chart = BarChart::new(bars)
-                        .width(1.0)
-                        .color(Color32::LIGHT_BLUE);
-
-                    Plot::new("predkosc")
-                        .width(chart_size)
-                        .height(chart_size)
-                        .allow_drag(false)
-                        .allow_scroll(false)
-                        .allow_zoom(false)
-                        .allow_boxed_zoom(false)
-                        .include_y(0)
-                        .include_y(y_range)
-                        .show(ui, |plot_ui| plot_ui.bar_chart(chart));
-
-
-                    /*
-                    let mut bars: Vec<Bar> = Vec::new();
-                    let values: Vec<f32> = self
-                        .particles
-                        .iter()
-                        .map(|p| (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt())
-                        .map(|v| (v / self.velocity_precision).floor() * self.velocity_precision)
-                        .collect();
-                    for v in values {
-                        let bar = Bar::new((v + self.velocity_precision / 2.0) as f64, 1.0);
-                        let index = bars.iter().position(|b| b.argument == bar.argument);
-                        match index {
-                            None => bars.push(bar),
-                            Some(i) => bars.get_mut(i).unwrap().value += 1.0,
-                        }
-                    }
-                    */
-
-                    /*
-                    let chart = BarChart::new(bars)
-                        .width(self.velocity_precision as f64)
-                        .color(Color32::LIGHT_BLUE);
-                    Plot::new("predkosc")
-                        .width(325.0)
-                        .height(325.0)
-                        .allow_drag(false)
-                        .allow_scroll(false)
-                        .allow_zoom(false)
-                        .allow_boxed_zoom(false)
-                        .include_x(0)
-                        .include_x(8.0)
-                        .include_y(0)
-                        .include_y(4.0)
-                        /* Tych dwóch właśnie chyba powinno nie być, skoro ustawiamy na sztywno zakres:
-                        .auto_bounds_x()
-                        .auto_bounds_y()
-                        */
-                        .show(ui, |plot_ui| plot_ui.bar_chart(chart));
-                        */
-
-                    // Histogram energii
-                    ui.heading("Rozkład energii");
-
-                    let mut bars: Vec<Bar> = Vec::new();
-                    let values: Vec<f32> = self
-                        .particles
-                        .iter()
-                        .map(|p| {
-                            let velocity = (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt();
-                            let mass = p.mass;
-                            mass * velocity.powi(2) * 0.5
-                        })
-                        .map(|v| (v / self.energy_precision).floor() * self.energy_precision)
-                        .collect();
-                    for v in values {
-                        let bar = Bar::new((v + self.energy_precision / 2.0) as f64, 1.0);
-                        let index = bars.iter().position(|b| b.argument == bar.argument);
-                        match index {
-                            None => bars.push(bar),
-                            Some(i) => bars.get_mut(i).unwrap().value += 1.0,
-                        }
-                    }
-
-                    let chart = BarChart::new(bars)
-                        .width(self.energy_precision as f64)
-                        .color(Color32::LIGHT_GREEN);
-                    Plot::new("energia")
-                        .width(325.0)
-                        .height(325.0)
-                        .allow_drag(false)
-                        .allow_scroll(false)
-                        .allow_zoom(false)
-                        .allow_boxed_zoom(false)
-                        .include_x(0)
-                        .include_x(32.0)
-                        .include_y(0)
-                        .include_y(4.0)
-                        .auto_bounds_x()
-                        .auto_bounds_y()
-                        .show(ui, |plot_ui| plot_ui.bar_chart(chart));
-                });
-
-                // Opcje
-                ui.vertical(|ui| {
-                    ui.heading("Opcje");
-
-                    ui.add_space(16.0);
-                    ui.label("Mnożnik czasu");
-                    ui.add(egui::Slider::new(&mut self.time_multiplier, 0.0..=1.0));
-
-                    ui.add_space(16.0);
-                    ui.label("Precyzja histogramu prędkości");
-                    ui.add(egui::Slider::new(&mut self.velocity_precision, 0.2..=2.0));
-
-                    ui.add_space(16.0);
-                    ui.label("Precyzja histogramu energii");
-                    ui.add(egui::Slider::new(&mut self.energy_precision, 0.4..=4.0));
-
-                    /* Opcje wstawiania cząsteczek myszką. */
-                    ui.heading("Wstawianie cząsteczek");
-
-                    ui.add_space(16.0);
-                    ui.add(egui::Slider::new(&mut self.user_particle_input_state.count, 1..=10).text("Ilość").clamp_to_range(false));
-
-                    ui.add_space(16.0);
-                    ui.add(egui::Slider::from_get_set(
-                        std::ops::RangeInclusive::new(-1.0, 1.0),
-                        |x| { 
-                            if let Some(x) = x { 
-                                self.user_particle_input_state.charge = x as f32; 
-                            } 
-                            self.user_particle_input_state.charge as f64 
-                        }
-                    ).text("Ładunek").clamp_to_range(true));
-
-                    ui.add_space(16.0);
-                    ui.add(egui::Slider::from_get_set(
-                        std::ops::RangeInclusive::new(0.01, 1.0),
-                        |x| { 
-                            if let Some(x) = x { 
-                                self.user_particle_input_state.mass = x as f32; 
-                            } 
-                            self.user_particle_input_state.mass as f64 
-                        }
-                    ).text("Masa").clamp_to_range(true));
-
-
-
-                    ui.add_space(16.0);
-                    if ui.button("Przywróć domyślne").clicked() {
-                        self.time_multiplier = 1.0;
-                        self.velocity_precision = 0.2;
-                        self.energy_precision = 1.0;
-                    }
-
-                    ui.add_space(16.0);
-                    ui.label("Motyw");
-                    egui::widgets::global_dark_light_mode_buttons(ui);
-
-                    /* Wykres środka ciężkości. */
-
-                    /* Jak się okazuje, nie ma chyba analogicznej wielkości dla ładunku, którą
-                     * można policzyć bez ogromnego wysiłku. */
                     {
-                        /* TODO: To trzeba powiększyć, ale przy aktualnym układzie nie mieści mi
-                         * się więcej wykresów na ekranie. */
-                        let plot_size = 20.0;
+                        /* Cząsteczki. */
+                        let markers_plot = Plot::new("markers_demo")
+                            .view_aspect(1.0)
+                            .width(simulation_plot_size)
+                            .height(simulation_plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .include_y(0.0)
+                            .include_y(1.0);
 
+                        ui.heading("Symulacja");
+
+                        markers_plot.show(ui, |plot_ui| {
+                            particle_plot_pointer_coordinates = plot_ui.pointer_coordinate();
+
+                            /* Szukamy indeksu cząsteczki pod kursorem. */
+                            if let Some(particle_plot_pointer_coordinates) = particle_plot_pointer_coordinates {
+                                let particle_plot_pointer_coordinates = na::Vector2::<f64>::new(particle_plot_pointer_coordinates.x, particle_plot_pointer_coordinates.y);
+
+                                /* Jeśli kursor znajduje się w co najwyżej takiej odległości od środka
+                                 * cząsteczki, to uznajemy, że jest na cząsteczce. */
+                                let selection_radius = 0.0235;
+
+                                /* Szukamy cząsteczki najbliżej kursora i patrzymy, czy jest w promieniu. */
+                                selected_particle_id = self.particles.iter()
+                                    .map(|p| (p.id, (p.position.cast::<f64>() - particle_plot_pointer_coordinates).magnitude()))
+                                    .min_by(|(_, d1), (_, d2)| d1.total_cmp(d2))
+                                    .filter(|(_, d)| d <= &selection_radius)
+                                    .map(|(id, _)| id);
+
+                            }
+
+
+                            for p in &self.particles {
+                                /* Dozwolone przedziały masy i ładunku są opisane w Particle::new(). */
+
+                                /* Kolor jest skalowany do dozwolonego przedziału ładunku, a nie do
+                                 * maksymalnego ładunku wśród wszystkich cząsteczek, bo jak dodajemy
+                                 * nowe cząsteczki w trakcie symulacji, to trzeba by było wszystko od
+                                 * nowa przeliczać jeśli zmieni się maksimum. */
+                                let color_value = 
+                                    /* Śledzona cząsteczka ma się wyróżniać. */
+                                    if self.tracked_particle.is_some() && self.tracked_particle.as_ref().unwrap().id == p.id {
+                                        Color32::from_rgb(0, 255, 255)
+                                    /* Zaznaczona też. */
+                                    } else if selected_particle_id.is_some() && selected_particle_id.unwrap() == p.id {
+                                        Color32::from_rgb(255, 255, 0)
+                                    } else {
+                                        if p.charge >= 0.0 {
+                                            /* "Casting from a float to an integer will round the float towards zero". */
+                                            Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
+                                        } else {
+                                            Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
+                                        }
+                                    };
+
+                                /* Analogiczny komentarz jak dla ładunku. */
+                                let radius = 7.0 * p.mass + 3.0;
+                                plot_ui.points(
+                                    Points::new([p.position.x as f64, p.position.y as f64])
+                                        .radius(radius)
+                                        .color(color_value),
+                                );
+                            }
+
+                        });
+                    }
+
+                    /* Opcje */
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.heading("Symulacja");
+
+                            ui.label("Szykość symulacji");
+                            /* Fixed decimals, bo inaczej całe UI się przesuwa gdy zmienia się
+                             * liczba cyfr po przecinku. */
+                            ui.add(egui::Slider::new(&mut self.time_multiplier, 0.0..=1.0).fixed_decimals(2));
+
+                            if ui.button("Nowa symulacja").clicked() {
+                                /* TODO */
+                            }
+                        });
+
+                        ui.vertical(|ui| {
+                            ui.heading("Interakcje");
+
+                            ui.horizontal(|ui| {
+                                if ui.button("Wstawianie").clicked() { self.click_action = ClickAction::Add; }
+                                if ui.button("Śledzenie").clicked() { self.click_action = ClickAction::Track; }
+                            });
+
+                            ui.add(egui::Slider::new(&mut self.user_particle_input_state.count, 1..=10).text("Ilość").clamp_to_range(false));
+
+                            ui.add(egui::Slider::from_get_set(
+                                std::ops::RangeInclusive::new(-1.0, 1.0),
+                                |x| { 
+                                    if let Some(x) = x { 
+                                        self.user_particle_input_state.charge = x as f32; 
+                                    } 
+                                    self.user_particle_input_state.charge as f64 
+                                }
+                            ).text("Ładunek").clamp_to_range(true)
+                                .custom_formatter(|value, _| format!("{:+.2}", value))
+                            );
+
+                            ui.add(egui::Slider::from_get_set(
+                                std::ops::RangeInclusive::new(0.01, 1.0),
+                                |x| { 
+                                    if let Some(x) = x { 
+                                        self.user_particle_input_state.mass = x as f32; 
+                                    } 
+                                    self.user_particle_input_state.mass as f64 
+                                }
+                            ).text("Masa").clamp_to_range(true).fixed_decimals(2));
+
+                        });
+
+                        ui.vertical(|ui| {
+                            ui.heading("Wyświetlanie");
+
+
+                            ui.label("Motyw");
+                            egui::widgets::global_dark_light_mode_buttons(ui);
+
+                        });
+                    });
+                });
+
+                ui.vertical(|ui| {
+                    {
+                        /* Prawdziwy histogram prędkości. */
+                        let mut bars: Vec<Bar> = Vec::new();
+                        let values: Vec<f32> = self
+                            .particles
+                            .iter()
+                            .map(|p| (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt())
+                            .map(|v| (v / self.velocity_precision).floor() * self.velocity_precision)
+                            .collect();
+                        for v in values {
+                            let bar = Bar::new((v + self.velocity_precision / 2.0) as f64, 1.0);
+                            let index = bars.iter().position(|b| b.argument == bar.argument);
+                            match index {
+                                None => bars.push(bar),
+                                Some(i) => bars.get_mut(i).unwrap().value += 1.0,
+                            }
+                        }
+                            
+
+                        ui.heading("Histogram prędkości");
+
+                        let chart = BarChart::new(bars)
+                            .width(self.velocity_precision as f64)
+                            .color(Color32::LIGHT_BLUE);
+                        Plot::new("predkosc")
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0)
+                            .include_x(8.0)
+                            .include_y(0)
+                            .include_y(4.0)
+                            .auto_bounds_x()
+                            .auto_bounds_y()
+                            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+
+                        ui.label("Precyzja histogramu prędkości");
+                        ui.add(egui::Slider::new(&mut self.velocity_precision, 0.2..=2.0));
+                    }
+
+                    ui.add_space(16.0);
+
+                    {
+                        /* Histogram energii. */
+                        let mut bars: Vec<Bar> = Vec::new();
+                        let values: Vec<f32> = self
+                            .particles
+                            .iter()
+                            .map(|p| {
+                                let velocity = (p.velocity[0].powi(2) + p.velocity[1].powi(2)).sqrt();
+                                let mass = p.mass;
+                                mass * velocity.powi(2) * 0.5
+                            })
+                            .map(|v| (v / self.energy_precision).floor() * self.energy_precision)
+                            .collect();
+                        for v in values {
+                            let bar = Bar::new((v + self.energy_precision / 2.0) as f64, 1.0);
+                            let index = bars.iter().position(|b| b.argument == bar.argument);
+                            match index {
+                                None => bars.push(bar),
+                                Some(i) => bars.get_mut(i).unwrap().value += 1.0,
+                            }
+                        }
+
+                        ui.heading("Histogram energii");
+
+                        let chart = BarChart::new(bars)
+                            .width(self.energy_precision as f64)
+                            .color(Color32::LIGHT_GREEN);
+                        Plot::new("energia")
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0)
+                            .include_x(32.0)
+                            .include_y(0)
+                            .include_y(4.0)
+                            .auto_bounds_x()
+                            .auto_bounds_y()
+                            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+
+                        ui.label("Precyzja histogramu energii");
+                        ui.add(egui::Slider::new(&mut self.energy_precision, 0.4..=4.0));
+                    }
+
+                });
+
+                ui.vertical(|ui| {
+                    {
+                        /* Pole wektorowe siły elektrostatycznej. */
+
+                        let vector_field = Plot::new("vector_field")
+                            .view_aspect(1.0)
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .include_y(0.0)
+                            .include_y(1.0)
+                            .show_axes([false, false]);
+
+                        ui.heading("Pole elektryczne");
+
+                        /* Ile wektorów chcemy mieć w każdym wymiarze. */
+                        let resolution = 8;
+                        let arrow_length = 0.1;
+
+                        let mut arrow_origins = Vec::with_capacity(resolution);
+                        let mut arrow_tips = Vec::with_capacity(resolution);
+
+                        for x in 0..resolution {
+                            for y in 0..resolution {
+                                let [x, y] = [(x as f64 + 0.5)/resolution as f64, (y as f64 + 0.5)/resolution as f64];
+                                let mut force = Particle::new(u32::MAX, x as f32, y as f32, 1.0, 0.5)
+                                    .net_electrostatic_force(self.particles.iter());
+
+                                if force.magnitude() != 0.0 {
+                                    force = force.normalize() * arrow_length;
+                                }
+
+                                arrow_origins.push([x, y]);
+                                arrow_tips.push([x + force.x as f64, y + force.y as f64]);
+                            }
+                        }
+
+
+                        vector_field.show(ui, |plot_ui| {
+                            plot_ui.arrows(
+                                egui::widgets::plot::Arrows::new(egui::widgets::plot::PlotPoints::from(arrow_origins), egui::widgets::plot::PlotPoints::from(arrow_tips))
+                                .color(Color32::from_rgb(255, 255, 255))
+                            )
+                        });
+
+                    } 
+
+                    {
+                        /* "Histogram" prędkości. */ 
+                        let mut velocities: Vec<_> = self.particles
+                            .iter()
+                            .map(|p| if p.velocity.magnitude().is_finite() { p.velocity.magnitude() } else { 0.0 } )
+                            .collect();
+
+                        /* Floaty nie implementują `Ord` bo NaN != NaN. */
+                        velocities.sort_by(|a, b| a.total_cmp(b));
+
+                        let bars: Vec<_> = velocities
+                            .iter()
+                            .enumerate()
+                            .map(|(i, &v)| Bar::new((i + 1) as f64, v as f64))
+                            .collect();
+
+                        let chart = BarChart::new(bars)
+                            .width(1.0)
+                            .color(Color32::LIGHT_BLUE);
+
+                        ui.heading("Rozkład prędkości");
+
+                        Plot::new("predkosc2")
+                            .width(plot_size)
+                            .height(plot_size)
+                            .allow_drag(false)
+                            .allow_scroll(false)
+                            .allow_zoom(false)
+                            .allow_boxed_zoom(false)
+                            .show_axes([false, false])
+                            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+                    }
+
+                    {
+                        /* Wykres środka ciężkości. */
+
+                        /* Jak się okazuje, nie ma chyba analogicznej wielkości dla ładunku, którą
+                         * można policzyć bez ogromnego wysiłku. */
                         let center_of_mass_plot = Plot::new("center_of_mass")
                             .view_aspect(1.0)
                             .width(plot_size)
@@ -416,14 +478,13 @@ impl eframe::App for MyEguiApp {
                             .include_y(1.0)
                             .show_axes([false, false]);
 
+                        ui.heading("Środek masy");
 
-                        ui.label("Środek masy");
-                        
                         center_of_mass_plot.show(ui, |plot_ui| {
                             if let Some(center_of_mass) = Particle::center_of_mass(self.particles.iter()) {
                                 plot_ui.points(
                                     Points::new([center_of_mass.x as f64, center_of_mass.y as f64])
-                                        .radius(2.0)
+                                        .radius(4.0)
                                         .color(Color32::from_rgb(255, 255, 255))
                                 );
                             }
@@ -440,22 +501,18 @@ impl eframe::App for MyEguiApp {
 
                     }
 
-                    ui.add_space(16.0);
-                    if ui.button("Wstawianie").clicked() {
-                        self.click_action = ClickAction::Add;
-                    }
+                    
 
-                    if ui.button("Śledzenie").clicked() {
-                        self.click_action = ClickAction::Track;
-                    }
 
+                });
+
+                ui.vertical(|ui| {
                     /* Wykresy dla śledzonej cząsteczki. */
                     if let Some(ref tracked_particle) = self.tracked_particle {
-                        /* TODO: To trzeba powiększyć, ale przy aktualnym układzie nie mieści mi
-                         * się więcej wykresów na ekranie. */
-                        let plot_size = 50.0;
-
                         /* Ścieżka ruchu. */
+
+                        ui.heading("Tor ruchu");
+
                         let path_plot = Plot::new("tracked_path")
                             .view_aspect(1.0)
                             .width(plot_size)
@@ -481,6 +538,9 @@ impl eframe::App for MyEguiApp {
                         });
 
                         /* Prędkość. */
+
+                        ui.heading("Wartość prędkości");
+
                         let velocity_plot = Plot::new("tracked_velocity")
                             .view_aspect(1.0)
                             .width(plot_size)
@@ -488,7 +548,10 @@ impl eframe::App for MyEguiApp {
                             .allow_drag(false)
                             .allow_scroll(false)
                             .allow_zoom(false)
-                            .allow_boxed_zoom(false);
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .show_axes([false, true]);
 
                         velocity_plot.show(ui, |plot_ui| {
                             plot_ui.line(
@@ -502,6 +565,9 @@ impl eframe::App for MyEguiApp {
                         });
 
                         /* Przyspieszenie. */
+
+                        ui.heading("Wartość przyspieszenia");
+
                         let acceleration_plot = Plot::new("tracked_acceleration")
                             .view_aspect(1.0)
                             .width(plot_size)
@@ -509,7 +575,10 @@ impl eframe::App for MyEguiApp {
                             .allow_drag(false)
                             .allow_scroll(false)
                             .allow_zoom(false)
-                            .allow_boxed_zoom(false);
+                            .allow_boxed_zoom(false)
+                            .include_x(0.0)
+                            .include_x(1.0)
+                            .show_axes([false, true]);
 
                         acceleration_plot.show(ui, |plot_ui| {
                             plot_ui.line(
@@ -521,10 +590,7 @@ impl eframe::App for MyEguiApp {
                                 )).color(Color32::from_rgb(255, 255, 255))
                             )
                         });
-
-
                     }
-
                 });
             });
 
