@@ -199,13 +199,11 @@ impl eframe::App for MyEguiApp {
                                     /* Zaznaczona też. */
                                     } else if selected_particle_id.is_some() && selected_particle_id.unwrap() == p.id {
                                         Color32::from_rgb(255, 255, 0)
+                                    } else if p.charge >= 0.0 {
+                                        /* "Casting from a float to an integer will round the float towards zero". */
+                                        Color32::from_rgb(255, 255 - (255.0 * p.charge) as u8, 255 - (255.0 * p.charge) as u8)
                                     } else {
-                                        if p.charge >= 0.0 {
-                                            /* "Casting from a float to an integer will round the float towards zero". */
-                                            Color32::from_rgb((255.0 * p.charge) as u8, 0, 0)
-                                        } else {
-                                            Color32::from_rgb(0, 0, (-255.0 * p.charge) as u8)
-                                        }
+                                        Color32::from_rgb(255 - (-255.0 * p.charge) as u8, 255 - (-255.0 * p.charge) as u8, 255)
                                     };
 
                                 /* Analogiczny komentarz jak dla ładunku. */
