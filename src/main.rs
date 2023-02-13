@@ -190,7 +190,7 @@ impl eframe::App for MyEguiApp {
                                 let color_value = 
                                     /* Śledzona cząsteczka ma się wyróżniać. */
                                     if self.tracked_particle.is_some() && self.tracked_particle.as_ref().unwrap().id == p.id {
-                                        Color32::from_rgb(0, 255, 255)
+                                        Color32::from_rgb(0, 255, 0)
                                     /* Zaznaczona też. */
                                     } else if selected_particle_id.is_some() && selected_particle_id.unwrap() == p.id {
                                         Color32::from_rgb(255, 255, 0)
