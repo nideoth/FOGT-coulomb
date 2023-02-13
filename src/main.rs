@@ -439,9 +439,9 @@ impl eframe::App for MyEguiApp {
 
                         let chart = BarChart::new(bars)
                             .width(1.0)
-                            .color(Color32::LIGHT_BLUE);
+                            .color(Color32::WHITE);
 
-                        ui.heading("Rozkład prędkości");
+                        ui.heading("Prędkości cząsteczek");
 
                         Plot::new("predkosc2")
                             .width(plot_size)
