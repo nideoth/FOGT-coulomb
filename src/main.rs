@@ -356,7 +356,7 @@ impl eframe::App for MyEguiApp {
                             .allow_zoom(false)
                             .allow_boxed_zoom(false)
                             .include_x(0)
-                            .include_x(32.0)
+                            .include_x(20.0)
                             .include_y(0)
                             .include_y(4.0)
                             .auto_bounds_x()
@@ -450,6 +450,8 @@ impl eframe::App for MyEguiApp {
                             .allow_scroll(false)
                             .allow_zoom(false)
                             .allow_boxed_zoom(false)
+                            .include_y(8.0)
+                            .auto_bounds_y()
                             .show_axes([false, false])
                             .show(ui, |plot_ui| plot_ui.bar_chart(chart));
                     }
