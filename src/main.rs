@@ -24,11 +24,6 @@ fn main() {
     eframe::run_native("FOGT", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
 }
 
-/* TODO: dodać przycisk do restartu symulacji bez wyłączania programu. */
-/* TODO: trzeba wymyślić lepszy schemat kolorów dla cząsteczek, bo im mniejszy ładunek tym bardziej
- * czarne one są, i nie widać ich na tle wykresu. */
-/* TODO: poprawić layout UI, żeby wszystkie wykresy się mieściły (zakładki?) */
-
 
 
 /* Co ma się dziać przy kliknięciu: dodawanie cząsteczek lub śledzenie zaznaczonej cząsteczki. */
@@ -229,7 +224,9 @@ impl eframe::App for MyEguiApp {
                             ui.add(egui::Slider::new(&mut self.time_multiplier, 0.0..=1.0).fixed_decimals(2));
 
                             if ui.button("Nowa symulacja").clicked() {
-                                /* TODO */
+                                selected_particle_id = None;
+                                self.tracked_particle = None;
+                                self.particles.clear();
                             }
                         });
 

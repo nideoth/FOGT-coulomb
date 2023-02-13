@@ -65,9 +65,6 @@ impl Particle {
         }
     }
 
-    /* TODO: może współczynniki siły elektrostatycznej i grawitacyjnej mogłyby być zmieniane przez
-     * użytkownika w trakcie symulacji? */
-
     /* Elektrostatyczna siła wypadkowa działająca na `self`, czyli, suma sił
      * oddziaływań elektrostatycznych z każdą cząsteczką z `particles`. */
     pub fn net_electrostatic_force(
