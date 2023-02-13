@@ -403,7 +403,7 @@ impl eframe::App for MyEguiApp {
                                     .net_electrostatic_force(self.particles.iter());
 
                                 if force.magnitude() != 0.0 {
-                                    force = force.normalize() * arrow_length;
+                                    force = force.normalize() * (force.magnitude().atan() / (std::f32::consts::PI / 2.0)).powf(4.0) * arrow_length;
                                 }
 
                                 arrow_origins.push([x, y]);
